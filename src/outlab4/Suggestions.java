@@ -2,10 +2,11 @@ package outlab4;
 
 import edu.princeton.cs.algs4.*;
 
+import java.util.LinkedList;
+
 public class Suggestions {
-    // dictionary of words
-    private final TST<Integer> dictionary;
-    private final Out output;
+    private final TST<Integer> dictionary; // dictionary of words
+    private final Out output; // where the corrected document is saved
 
     /**
      * Creates list of correctly spelled words for the user to choose
@@ -29,13 +30,13 @@ public class Suggestions {
     public void checkDocument(In doc) {
         while (!doc.isEmpty()) {
             // gets the next word
-            String word = doc.readString();
+            String current = doc.readString();
             // make suggestions for correct word and replace it
-            if (!dictionary.contains(word)) {
-                String rightWord = possibilities(word);
+            if (!dictionary.contains(current)) {
+                String rightWord = possibilities(current);
                 output.print(rightWord + "\n");
             } else {
-                output.print(word + "\n");
+                output.print(current + "\n");
             }
         }
     }
@@ -48,34 +49,45 @@ public class Suggestions {
     public String possibilities(String word) {
         // this TST will track all the potential words
         TST<Integer> tst = new TST<>();
-
         // Puts words with 1 char removed from misspelled word in tst
+        LinkedList<String> del = deleteCase(word, tst);
+        // Put in words with 1 insertion needed
+        LinkedList<String> add = insertCase(word, tst);
+        // PUTS IN WORDS WITH 1 swap needed
+        LinkedList<String> swap = swapCase(word, tst);
+
+        // if there are no possibilities found perform more operations on before ignored strings
+        if (tst.size() == 0) {
+            indefiniteCases(tst, del, add, swap);
+        }
+
+        StdOut.println("\n" + word + ": did you mean:\n");
+        printOptions(tst);
+        return StdIn.readLine();
+
+        // nothing done if the user wants more options
+    }
+
+    private LinkedList<String> deleteCase(String word, TST<Integer> tst) {
+        // Puts words with 1 char removed from misspelled word in tst
+        LinkedList<String> delPosibilities = new LinkedList<>();
         for (int i = 0; i < word.length(); i++) {
             // take out the char
             StringBuilder sb = new StringBuilder();
             sb.append(word);
             sb.deleteCharAt(i);
-            String currentString = sb.toString();
-            if (dictionary.contains(currentString))
-                tst.put(currentString,0);
+
+            String current = sb.toString();
+            delPosibilities.add(current);
+
+            if (dictionary.contains(current))
+                tst.put(current,0);
         }
+        return delPosibilities;
+    }
 
-        // PUTS IN WORDS WITH 1 swap needed
-        for (int i = 0; i < word.length() - 1; i++) {
-            for (int j = i+1; j < word.length(); j++) {
-                // swap chars
-                char[] chars = word.toCharArray();
-                char temp = chars[i];
-                chars[i] = chars[j];
-                chars[j] = temp;
-
-                String currentString = String.valueOf(chars);
-                if (dictionary.contains(currentString))
-                    tst.put(currentString, 0);
-            }
-        }
-
-        // Put in words with 1 insertion needed
+    private LinkedList<String> insertCase(String word, TST<Integer> tst) {
+        LinkedList<String> addPosibilities = new LinkedList<>();
         for (int i = 0; i < word.length() + 1; i++) {
             // adds each letter somewhere in the word
             StringBuilder sb = new StringBuilder();
@@ -87,6 +99,8 @@ public class Suggestions {
                 sb.insert(i, letter);
 
                 String current = sb.toString();
+                addPosibilities.add(current);
+
                 if (dictionary.contains(current)) {
                     tst.put(current, 0);
                 }
@@ -94,14 +108,65 @@ public class Suggestions {
                 sb.deleteCharAt(i);
             }
         }
-
-        StdOut.println("\n" + word + ": did you mean:\n");
-        printOptions(tst);
-        return StdIn.readLine();
-
-        // nothing done if the user wants more options
+        return addPosibilities;
     }
 
+    private LinkedList<String> swapCase(String word, TST<Integer> tst) {
+        LinkedList<String> swapPosibilities = new LinkedList<>();
+        for (int i = 0; i < word.length() - 1; i++) {
+            for (int j = i+1; j < word.length(); j++) {
+                // swap chars
+                char[] chars = word.toCharArray();
+                char temp = chars[i];
+                chars[i] = chars[j];
+                chars[j] = temp;
+
+                String current = String.valueOf(chars);
+                swapPosibilities.add(current);
+
+                if (dictionary.contains(current))
+                    tst.put(current, 0);
+            }
+        }
+        return swapPosibilities;
+    }
+
+    /**
+     * takes care of cases where there needs to be multiple changes to find correct word
+     * @param del list of 1 char delete possibilities
+     * @param add  list of 1 char add possibilities
+     * @param swap list of 1 char swap possibilities
+     */
+    private void indefiniteCases(TST<Integer> tst, LinkedList<String> del, LinkedList<String> add, LinkedList<String> swap) {
+        // loop through del and perform add and swap on them
+
+        for (String a : del) {
+            deleteCase(a, tst);
+            insertCase(a, tst);
+            swapCase(a, tst);
+
+        }
+
+        // loop through add and perform del and swap on them
+        for (String a : add) {
+            insertCase(a, tst);
+            deleteCase(a, tst);
+            swapCase(a, tst);
+        }
+
+        // loop through swap and perform delete and insert on them
+        for (String a : swap) {
+            swapCase(a, tst);
+            insertCase(a, tst);
+            deleteCase(a, tst);
+        }
+
+    }
+
+    /**
+     * Prints what words the user can chose from
+     * @param tst the list of potential words
+     */
     private void printOptions(TST<Integer> tst) {
         for (String word : tst.keys()) {
             StdOut.println(word);

@@ -10,5 +10,6 @@ public class SpellCheck {
 
         Suggestions suggestions = new Suggestions(WORDS, OUT_FILEPATH);
         suggestions.checkDocument(DOCUMENT);
+        //suggestions.possibilities("batnederrs");
     }
 }
