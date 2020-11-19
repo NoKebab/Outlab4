@@ -4,7 +4,7 @@ import edu.princeton.cs.algs4.*;
 
 import java.util.LinkedList;
 
-public class Suggestions {
+public class Suggestions implements BasicCases {
     private final TST<Integer> dictionary; // dictionary of words
     private final Out output; // where the corrected document is saved
 
@@ -13,7 +13,7 @@ public class Suggestions {
      * @param words list of correctly spelled words
      * @param filePath path where the spell corrected document is put
      */
-    public Suggestions(In words, String filePath) {
+    public Suggestions(final In words, final String filePath) {
         dictionary = new TST<>();
         output = new Out(filePath);
         // fill up the dictionary with words
@@ -27,16 +27,15 @@ public class Suggestions {
      * Also provides suggestions for each misspelled word
      * @param doc text document to be spell checked
      */
-    public void checkDocument(In doc) {
-        while (!doc.isEmpty()) {
-            // gets the next word and make it lowercase
-            String current = doc.readString().toLowerCase();
+    public void checkDocument(final In doc) {
+        String[] words = doc.readAllStrings();
+        for (String word : words) {
             // make suggestions for correct word and replace it
-            if (!dictionary.contains(current)) {
-                String rightWord = possibilities(current);
+            if (!dictionary.contains(word)) {
+                String rightWord = possibilities(word);
                 output.print(rightWord + "\n");
             } else {
-                output.print(current + "\n");
+                output.print(word + "\n");
             }
         }
     }
@@ -46,35 +45,41 @@ public class Suggestions {
      * @param word misspelled word
      * @return correctly spelled word chosen by user
      */
-    public String possibilities(String word) {
+    public String possibilities(final String word) {
         // this TST will track all the potential words
         TST<Integer> tst = new TST<>();
-        // Puts words with 1 char removed from misspelled word in tst
-        LinkedList<String> del = deleteCase(word, tst);
-        // Put in words with 1 insertion needed
-        LinkedList<String> add = insertCase(word, tst);
-        // PUTS IN WORDS WITH 1 swap needed
-        LinkedList<String> swap = swapCase(word, tst);
 
-        // if there are no possibilities found perform more operations on before ignored strings
+        LinkedList<String> del = delete(word, tst); // Puts words with 1 char removed from misspelled word in tst
+        LinkedList<String> add = insert(word, tst); // Put in words with 1 insertion needed
+        LinkedList<String> rep = replace(word, tst); // Put in words with 1 replacement needed
+        LinkedList<String> swap = swap(word, tst); // PUTS IN WORDS WITH 1 swap needed
+
+        // combine the Linked Lists
+        LinkedList<String> totalPossibilities = combinePossibilities(del, add, rep, swap);
+
+        // preemptively try advanced cases if none where found already
         if (tst.size() == 0) {
-            indefiniteCases(tst, del, add, swap);
+           indefiniteCases(tst, totalPossibilities);
         }
 
-        StdOut.printf("\n%s: did you mean:\n", word);
-        printOptions(tst);
-        String option = StdIn.readLine();
-        // search for more possibilities if the user doesn't enter a string
-        if (option.equals("")) {
-           indefiniteCases(tst, del, add, swap);
-           StdOut.println("\nMoreOptions:\n");
-           printOptions(tst);
-           option = StdIn.readLine();
-        }
-        return option;
+        UI ui = new UI(this, tst);
+        return ui.chooseWord(word, totalPossibilities);
     }
 
-    private LinkedList<String> deleteCase(String word, TST<Integer> tst) {
+    @SafeVarargs
+    // combine all the possible combinations into one list for convenience
+    private LinkedList<String> combinePossibilities(LinkedList<String>... lists) {
+        LinkedList<String> total = new LinkedList<>();
+        for (LinkedList<String> list : lists) {
+           total.addAll(list);
+        }
+        return total;
+    }
+
+    // BASIC CASES:
+
+    // deletes one char in the word and tests if it's in the dictionary
+    public LinkedList<String> delete(String word, TST<Integer> tst) {
         // Puts words with 1 char removed from misspelled word in tst
         LinkedList<String> delPossibilities = new LinkedList<>();
         for (int i = 0; i < word.length(); i++) {
@@ -92,7 +97,8 @@ public class Suggestions {
         return delPossibilities;
     }
 
-    private LinkedList<String> insertCase(String word, TST<Integer> tst) {
+    // inserts one char in the word and tests if it's in the dictionary
+    public LinkedList<String> insert(String word, TST<Integer> tst) {
         LinkedList<String> addPossibilities = new LinkedList<>();
         for (int i = 0; i < word.length() + 1; i++) {
             // adds each letter somewhere in the word
@@ -116,7 +122,30 @@ public class Suggestions {
         return addPossibilities;
     }
 
-    private LinkedList<String> swapCase(String word, TST<Integer> tst) {
+    // replaces one char in the word and tests if it's in the dictionary
+    public LinkedList<String> replace(String word, TST<Integer> tst) {
+        LinkedList<String> replacePossibilities = new LinkedList<>();
+        for (int i = 0; i < word.length(); i++) {
+            // adds each letter somewhere in the word
+            char[] chars = word.toCharArray();
+            // a = 97... z = 122
+            for (int j = 97; j <= 122; j++) {
+                // get ascii char
+                char letter = (char)j;
+                chars[i] = letter;
+                String current = String.valueOf(chars);
+                replacePossibilities.add(current);
+
+                if (dictionary.contains(current)) {
+                    tst.put(current, 0);
+                }
+            }
+        }
+        return replacePossibilities;
+    }
+
+    // swaps two chars in the word and tests if it's in the dictionary
+    public LinkedList<String> swap(String word, TST<Integer> tst) {
         LinkedList<String> swapPosibilities = new LinkedList<>();
         for (int i = 0; i < word.length() - 1; i++) {
             for (int j = i+1; j < word.length(); j++) {
@@ -136,36 +165,25 @@ public class Suggestions {
         return swapPosibilities;
     }
 
+    // ADVANCED CASES
+
     /**
      * takes care of cases where there needs to be multiple changes to find correct word
-     * @param del list of 1 char delete possibilities
-     * @param add  list of 1 char add possibilities
-     * @param swap list of 1 char swap possibilities
+     * @param tst the Ternary Search Tree that contains all the found dictionary words
+     * @param total list of all possible combinations
      */
-    private void indefiniteCases(TST<Integer> tst, LinkedList<String> del, LinkedList<String> add, LinkedList<String> swap) {
-        // combine all the possibilities into one collection
-        LinkedList<String> total = new LinkedList<>();
-        total.addAll(del);
-        total.addAll(add);
-        total.addAll(swap);
-
+    public void indefiniteCases(TST<Integer> tst, LinkedList<String> total) {
         // perform all cases
         for (String a : total) {
-            deleteCase(a, tst);
-            insertCase(a, tst);
-            swapCase(a, tst);
+            delete(a, tst);
+            insert(a, tst);
+            replace(a, tst);
+            swap(a, tst);
         }
     }
 
-    /**
-     * Prints what words the user can chose from
-     * @param tst the list of potential words
-     */
-    private void printOptions(TST<Integer> tst) {
-        for (String word : tst.keys()) {
-            StdOut.println(word);
-        }
-        StdOut.print("\nEnter the word you want. Hit return if none.\nWord: ");
+    private void recHelper() {
+
     }
 
 }
