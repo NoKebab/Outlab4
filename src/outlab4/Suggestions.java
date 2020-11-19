@@ -29,8 +29,8 @@ public class Suggestions {
      */
     public void checkDocument(In doc) {
         while (!doc.isEmpty()) {
-            // gets the next word
-            String current = doc.readString();
+            // gets the next word and make it lowercase
+            String current = doc.readString().toLowerCase();
             // make suggestions for correct word and replace it
             if (!dictionary.contains(current)) {
                 String rightWord = possibilities(current);
@@ -61,16 +61,22 @@ public class Suggestions {
             indefiniteCases(tst, del, add, swap);
         }
 
-        StdOut.println("\n" + word + ": did you mean:\n");
+        StdOut.printf("\n%s: did you mean:\n", word);
         printOptions(tst);
-        return StdIn.readLine();
-
-        // nothing done if the user wants more options
+        String option = StdIn.readLine();
+        // search for more possibilities if the user doesn't enter a string
+        if (option.equals("")) {
+           indefiniteCases(tst, del, add, swap);
+           StdOut.println("\nMoreOptions:\n");
+           printOptions(tst);
+           option = StdIn.readLine();
+        }
+        return option;
     }
 
     private LinkedList<String> deleteCase(String word, TST<Integer> tst) {
         // Puts words with 1 char removed from misspelled word in tst
-        LinkedList<String> delPosibilities = new LinkedList<>();
+        LinkedList<String> delPossibilities = new LinkedList<>();
         for (int i = 0; i < word.length(); i++) {
             // take out the char
             StringBuilder sb = new StringBuilder();
@@ -78,16 +84,16 @@ public class Suggestions {
             sb.deleteCharAt(i);
 
             String current = sb.toString();
-            delPosibilities.add(current);
+            delPossibilities.add(current);
 
             if (dictionary.contains(current))
                 tst.put(current,0);
         }
-        return delPosibilities;
+        return delPossibilities;
     }
 
     private LinkedList<String> insertCase(String word, TST<Integer> tst) {
-        LinkedList<String> addPosibilities = new LinkedList<>();
+        LinkedList<String> addPossibilities = new LinkedList<>();
         for (int i = 0; i < word.length() + 1; i++) {
             // adds each letter somewhere in the word
             StringBuilder sb = new StringBuilder();
@@ -97,9 +103,8 @@ public class Suggestions {
                 // get ascii char
                 char letter = (char)j;
                 sb.insert(i, letter);
-
                 String current = sb.toString();
-                addPosibilities.add(current);
+                addPossibilities.add(current);
 
                 if (dictionary.contains(current)) {
                     tst.put(current, 0);
@@ -108,7 +113,7 @@ public class Suggestions {
                 sb.deleteCharAt(i);
             }
         }
-        return addPosibilities;
+        return addPossibilities;
     }
 
     private LinkedList<String> swapCase(String word, TST<Integer> tst) {
@@ -138,29 +143,18 @@ public class Suggestions {
      * @param swap list of 1 char swap possibilities
      */
     private void indefiniteCases(TST<Integer> tst, LinkedList<String> del, LinkedList<String> add, LinkedList<String> swap) {
-        // loop through del and perform add and swap on them
+        // combine all the possibilities into one collection
+        LinkedList<String> total = new LinkedList<>();
+        total.addAll(del);
+        total.addAll(add);
+        total.addAll(swap);
 
-        for (String a : del) {
+        // perform all cases
+        for (String a : total) {
             deleteCase(a, tst);
             insertCase(a, tst);
             swapCase(a, tst);
-
         }
-
-        // loop through add and perform del and swap on them
-        for (String a : add) {
-            insertCase(a, tst);
-            deleteCase(a, tst);
-            swapCase(a, tst);
-        }
-
-        // loop through swap and perform delete and insert on them
-        for (String a : swap) {
-            swapCase(a, tst);
-            insertCase(a, tst);
-            deleteCase(a, tst);
-        }
-
     }
 
     /**
@@ -173,4 +167,5 @@ public class Suggestions {
         }
         StdOut.print("\nEnter the word you want. Hit return if none.\nWord: ");
     }
+
 }
